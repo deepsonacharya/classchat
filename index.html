@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ClassChat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1c2433;
+    --paper: #f3f5f8;
+    --side: #1f3a5f;
+    --side-ink: #dbe6f3;
+    --accent: #2d8a6e;
+    --mine: #dcefe7;
+    --theirs: #ffffff;
+    --muted: #6b7686;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif;
+    color: var(--ink); background: var(--paper); font-size: 15px;
+  }
+  button { font: inherit; cursor: pointer; }
+  :focus-visible { outline: 3px solid #f2b134; outline-offset: 2px; }
+
+  /* Join screen */
+  #join { height: 100%; display: grid; place-items: center; padding: 24px; }
+  #join form { width: 100%; max-width: 360px; }
+  #join h1 { font-size: 30px; margin: 0 0 6px; }
+  #join p { color: var(--muted); margin: 0 0 22px; line-height: 1.5; }
+  #join input {
+    width: 100%; padding: 12px 14px; font: inherit; font-size: 17px;
+    border: 2px solid #c9d2de; border-radius: 10px; background: #fff;
+  }
+  #join button {
+    margin-top: 12px; width: 100%; padding: 12px; border: 0; border-radius: 10px;
+    background: var(--accent); color: #fff; font-weight: 700; font-size: 16px;
+  }
+
+  /* Chat layout */
+  #app { display: none; height: 100%; grid-template-columns: 240px 1fr; }
+  aside { background: var(--side); color: var(--side-ink); display: flex; flex-direction: column; min-height: 0; }
+  aside .me { padding: 18px 16px 10px; font-size: 13px; opacity: .8; }
+  aside .me strong { display: block; font-size: 17px; opacity: 1; color: #fff; }
+  #threads { list-style: none; margin: 0; padding: 6px 8px; overflow-y: auto; flex: 1; }
+  #threads li button {
+    width: 100%; display: flex; align-items: center; gap: 10px; text-align: left;
+    padding: 9px 10px; border: 0; border-radius: 8px; background: transparent; color: inherit;
+  }
+  #threads li button:hover { background: rgba(255,255,255,.07); }
+  #threads li button[aria-current="true"] { background: rgba(255,255,255,.16); color: #fff; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: #56d6a7; flex: none; }
+  .dot.off { background: transparent; border: 2px solid #7f93ad; }
+  .dot.all { border-radius: 2px; background: #f2b134; }
+  .label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .badge { background: #f2b134; color: #1c2433; font-weight: 700; font-size: 12px; border-radius: 10px; padding: 1px 7px; }
+  aside .tools { padding: 12px; display: grid; gap: 8px; }
+  aside .tools button {
+    padding: 9px; border-radius: 8px; border: 1px solid rgba(255,255,255,.25);
+    background: transparent; color: #fff;
+  }
+
+  main { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  header { padding: 14px 20px; border-bottom: 1px solid #dde3ea; background: #fff; }
+  header h2 { margin: 0; font-size: 18px; }
+  header span { color: var(--muted); font-size: 13px; }
+  #status { color: #b5451b; font-size: 13px; }
+  #messages { flex: 1; overflow-y: auto; padding: 18px 20px; display: flex; flex-direction: column; gap: 6px; }
+  .msg { max-width: min(70ch, 80%); padding: 8px 12px; border-radius: 12px; background: var(--theirs); border: 1px solid #e1e6ec; line-height: 1.45; white-space: pre-wrap; word-wrap: break-word; }
+  .msg.mine { align-self: flex-end; background: var(--mine); border-color: #c4e2d5; }
+  .msg .who { font-weight: 700; font-size: 13px; color: var(--side); margin-bottom: 2px; }
+  .msg .time { font-size: 11px; color: var(--muted); margin-left: 8px; font-weight: 400; }
+  .empty { margin: auto; color: var(--muted); text-align: center; max-width: 36ch; line-height: 1.5; }
+  #composer { display: flex; gap: 8px; padding: 12px 16px; background: #fff; border-top: 1px solid #dde3ea; }
+  #composer textarea {
+    flex: 1; resize: none; font: inherit; padding: 10px 12px; height: 44px;
+    border: 2px solid #c9d2de; border-radius: 10px;
+  }
+  #composer button { padding: 0 20px; border: 0; border-radius: 10px; background: var(--accent); color: #fff; font-weight: 700; }
+
+  @media (max-width: 700px) {
+    #app { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+    aside { flex-direction: row; align-items: center; }
+    aside .me, aside .tools { display: none; }
+    #threads { display: flex; overflow-x: auto; overflow-y: hidden; }
+    #threads li button { white-space: nowrap; }
+  }
+</style>
+</head>
+<body>
+
+<section id="join">
+  <form id="joinForm">
+    <h1>ClassChat</h1>
+    <p>Type your name to join. You can message the whole group or anyone in it privately.</p>
+    <input id="nameInput" maxlength="30" placeholder="Your name" autocomplete="name" required>
+    <button type="submit">Join chat</button>
+  </form>
+</section>
+
+<div id="app">
+  <aside>
+    <div class="me">Signed in as <strong id="meName"></strong></div>
+    <ul id="threads"></ul>
+    <div class="tools">
+      <button id="copyLink">Copy invite link</button>
+      <button id="notifyBtn">Turn on notifications</button>
+    </div>
+  </aside>
+  <main>
+    <header>
+      <h2 id="threadTitle">Everyone</h2>
+      <span id="threadSub"></span> <span id="status"></span>
+    </header>
+    <div id="messages"></div>
+    <form id="composer">
+      <textarea id="text" placeholder="Write a message" rows="1"></textarea>
+      <button type="submit">Send</button>
+    </form>
+  </main>
+</div>
+
+<script>
+const ALL = "__all__";
+const room = location.pathname.split("/").pop();
+const store = key => "classchat:" + room + ":" + key;
+
+let me = null, ws = null, online = [];
+const threads = { [ALL]: [] };
+const unread = {};
+let active = ALL;
+
+const $ = id => document.getElementById(id);
+
+// ---------- join ----------
+function safeGet(k) { try { return localStorage.getItem(k); } catch { return null; } }
+function safeSet(k, v) { try { localStorage.setItem(k, v); } catch {} }
+
+const saved = safeGet(store("name"));
+if (saved) start(saved);
+
+$("joinForm").onsubmit = e => {
+  e.preventDefault();
+  const n = $("nameInput").value.trim();
+  if (!n) return;
+  safeSet(store("name"), n);
+  start(n);
+};
+
+function start(name) {
+  $("join").style.display = "none";
+  $("app").style.display = "grid";
+  connect(name);
+  updateNotifyBtn();
+}
+
+// ---------- network ----------
+function connect(name) {
+  const proto = location.protocol === "https:" ? "wss" : "ws";
+  ws = new WebSocket(`${proto}://${location.host}/ws/${room}`);
+  ws.onopen = () => { ws.send(JSON.stringify({ type: "join", name })); $("status").textContent = ""; };
+  ws.onmessage = e => handle(JSON.parse(e.data));
+  ws.onclose = () => {
+    $("status").textContent = "Reconnecting…";
+    setTimeout(() => connect(name), 2000);
+  };
+}
+
+function keyFor(m) {
+  if (m.to === null) return ALL;
+  return m.from === me ? m.to : m.from;
+}
+
+function handle(d) {
+  if (d.type === "welcome") {
+    me = d.name;
+    $("meName").textContent = me;
+    for (const k in threads) threads[k] = k === ALL ? [] : [];
+    d.history.forEach(m => (threads[keyFor(m)] ||= []).push(m));
+    renderAll();
+  } else if (d.type === "users") {
+    online = d.users;
+    renderThreads();
+    renderHeader();
+  } else if (d.type === "msg") {
+    const k = keyFor(d);
+    (threads[k] ||= []).push(d);
+    if (d.from !== me) {
+      const looking = k === active && !document.hidden;
+      if (!looking) {
+        unread[k] = (unread[k] || 0) + 1;
+        alertUser(d, k);
+      }
+    }
+    if (k === active) renderMessages();
+    renderThreads();
+    updateTitle();
+  }
+}
+
+// ---------- notifications ----------
+function alertUser(m, k) {
+  if (!("Notification" in window) || Notification.permission !== "granted") return;
+  if (!document.hidden && document.hasFocus()) return; // in-app badge is enough
+  const title = m.to === null ? `${m.from} in Everyone` : `${m.from} (private)`;
+  const n = new Notification(title, { body: m.text.slice(0, 180), tag: k });
+  n.onclick = () => { window.focus(); openThread(k); n.close(); };
+}
+
+function updateNotifyBtn() {
+  const b = $("notifyBtn");
+  if (!("Notification" in window)) { b.textContent = "Notifications not supported"; b.disabled = true; return; }
+  if (Notification.permission === "granted") { b.textContent = "Notifications on"; b.disabled = true; }
+  else if (Notification.permission === "denied") { b.textContent = "Notifications blocked in browser settings"; b.disabled = true; }
+}
+$("notifyBtn").onclick = async () => { await Notification.requestPermission(); updateNotifyBtn(); };
+
+$("copyLink").onclick = async () => {
+  try { await navigator.clipboard.writeText(location.href); $("copyLink").textContent = "Link copied"; }
+  catch { prompt("Copy this link:", location.href); }
+  setTimeout(() => $("copyLink").textContent = "Copy invite link", 2000);
+};
+
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) { unread[active] = 0; renderThreads(); updateTitle(); }
+});
+
+function updateTitle() {
+  const total = Object.values(unread).reduce((a, b) => a + b, 0);
+  document.title = total ? `(${total}) ClassChat` : "ClassChat";
+}
+
+// ---------- rendering ----------
+function openThread(k) {
+  active = k;
+  unread[k] = 0;
+  renderAll();
+  updateTitle();
+  $("text").focus();
+}
+
+function renderAll() { renderThreads(); renderHeader(); renderMessages(); }
+
+function renderThreads() {
+  const ul = $("threads");
+  ul.innerHTML = "";
+  const people = new Set(online.filter(n => n !== me));
+  Object.keys(threads).forEach(k => { if (k !== ALL && threads[k].length) people.add(k); });
+  const list = [ALL, ...[...people].sort((a, b) => a.localeCompare(b))];
+
+  list.forEach(k => {
+    const li = document.createElement("li");
+    const b = document.createElement("button");
+    b.setAttribute("aria-current", k === active);
+    const dot = document.createElement("span");
+    dot.className = "dot" + (k === ALL ? " all" : online.includes(k) ? "" : " off");
+    const label = document.createElement("span");
+    label.className = "label";
+    label.textContent = k === ALL ? "Everyone" : k;
+    b.append(dot, label);
+    if (unread[k]) {
+      const badge = document.createElement("span");
+      badge.className = "badge";
+      badge.textContent = unread[k];
+      b.append(badge);
+    }
+    b.onclick = () => openThread(k);
+    li.append(b);
+    ul.append(li);
+  });
+}
+
+function renderHeader() {
+  if (active === ALL) {
+    $("threadTitle").textContent = "Everyone";
+    $("threadSub").textContent = `${online.length} online`;
+  } else {
+    $("threadTitle").textContent = active;
+    $("threadSub").textContent = online.includes(active) ? "Private chat · online" : "Private chat · offline";
+  }
+}
+
+function renderMessages() {
+  const box = $("messages");
+  box.innerHTML = "";
+  const list = threads[active] || [];
+  if (!list.length) {
+    const e = document.createElement("div");
+    e.className = "empty";
+    e.textContent = active === ALL
+      ? "No messages yet. Copy the invite link and send it to your classmates."
+      : `Start a private chat with ${active}. Only the two of you will see it.`;
+    box.append(e);
+    return;
+  }
+  list.forEach(m => {
+    const div = document.createElement("div");
+    div.className = "msg" + (m.from === me ? " mine" : "");
+    const who = document.createElement("div");
+    who.className = "who";
+    who.textContent = m.from === me ? "You" : m.from;
+    const t = document.createElement("span");
+    t.className = "time";
+    t.textContent = new Date(m.ts).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    who.append(t);
+    const body = document.createElement("div");
+    body.textContent = m.text;
+    div.append(who, body);
+    box.append(div);
+  });
+  box.scrollTop = box.scrollHeight;
+}
+
+// ---------- sending ----------
+$("composer").onsubmit = e => {
+  e.preventDefault();
+  const text = $("text").value.trim();
+  if (!text || !ws || ws.readyState !== 1) return;
+  ws.send(JSON.stringify({ type: "msg", text, to: active === ALL ? null : active }));
+  $("text").value = "";
+};
+$("text").addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("composer").requestSubmit(); }
+});
+</script>
+</body>
+</html>
